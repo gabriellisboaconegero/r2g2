@@ -1,0 +1,3 @@
+id,email,encrypted_password,papel,reset_password_token,reset_password_sent_at,remember_created_at,created_at,updated_at
+1,coordenador@adega.com,$2a$12$U5Z7bmjdq.hZxrT0u2OheucS2CInlVaWl8iqJhL.X2LJGEHd4DRum,1,,,,2024-11-12 20:14:10.336339,2024-11-12 20:14:10.336339
+2,admin@adega.com,$2a$12$S/L3hzJB9IV7Z49qaS591Ot2Gm4BzsV/6ZXxjV3MsFS0DrSxebnH.,2,,,,2024-11-12 20:14:10.774321,2024-11-12 20:14:10.774321

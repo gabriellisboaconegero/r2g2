@@ -1,0 +1,6 @@
+id,nome,codigo_adega,codigo_externo,versao,curso_id,estado_curriculo_id,created_at,updated_at
+1,Curso de Ciência da Computação - Bacharelado (1988),21A-1988,21A,1988,,2,2024-11-12 20:03:30.170587,2024-11-12 20:03:30.170587
+2,Curso de Ciência da Computação - Bacharelado (1988),21A-1998,21A,1998,,2,2024-11-12 20:03:30.181161,2024-11-12 20:03:30.181161
+3,Curso de Ciência da Computação - Bacharelado (2011),21A-2011,21A,2011,,3,2024-11-12 20:03:30.190092,2024-11-12 20:03:30.190092
+4,Curso de Ciência da Computação - Bacharelado (2019),21A-2019,21A,2019,,3,2024-11-12 20:03:30.199652,2024-11-12 20:03:30.199652
+5,Curso de Ciência da Computação (2023),21A-2023,21A,2023,,3,2024-11-12 20:03:30.208970,2024-11-12 20:03:30.208970
