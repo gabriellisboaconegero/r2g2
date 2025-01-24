@@ -107,35 +107,52 @@ mapping_info = {
     },
 }
 
+def get_tables_name(cursor):
+    cursor.execute("select name from pragma_table_list where schema='main'")
+    return [row[0] for row in cursor.fetchall()]
+
+# 'PRAGMA table_info({table})' schema:
+#  0     1      2        3            4          5
+# cid | name | type | notnull | default_value | pk
+# Retirado de https://www.sqlite.org/pragma.html#pragma_table_info
+# """
+# This pragma returns one row for each normal column in the named table. Columns in the result set include:
+# "name" (its name);
+# "type" (data type if given, else '');
+# "notnull" (whether or not the column can be NULL);
+# "dflt_value" (the default value for the column); and
+# "pk" (either zero for columns that are not part of the primary key, or the 1-based index of the column within the primary key).
+
+# The "cid" column should not be taken to mean more than "rank within the current result set".
+# """
+def get_table_columns(cursor, table):
+    cursor.execute(f"PRAGMA table_info({table})")
+    return [row[1] for row in cursor.fetchall()]
+
+def get_table_pk(cursor, table):
+    cursor.execute(f"PRAGMA table_info({table})")
+    return [row[1] for row in cursor.fetchall() if row[5] == 1]
+
 def gen_vertices():
     # Obter todos os nomes de tabelas
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = cursor.fetchall()
+    tables = get_tables_name(cursor)
 
     for table_name in tables:
-        table_name = table_name[0]
         if table_name not in mapping_info.keys():
             print(f'! VERT: Tabela {table_name} não tem informações para gerar cypher')
             continue
         table_info = mapping_info[table_name]
 
-        output_file = os.path.join(output_dir, f"{table_name}.cypher")
-
-        # Selecionar os dados da tabela
-        cursor.execute(f"SELECT * FROM {table_name}")
+        table_columns = get_table_columns(cursor, table_name)
+        table_pks = set(get_table_pk(cursor, table_name))
 
         # Obter os nomes das colunas que estão em mapping_info da tabela da itração
-        column_names = []
-        ok = False
-        for description in cursor.description:
-            if description[0] == 'id':
-                ok = True
-            if description[0] in table_info['attrs']:
-                column_names.append(description[0])
-
-        if not ok:
-            print("! VERT: Tabela não tem coluna 'id', não vai ser gerado arquivo cypher")
-            continue
+        # e retira as que são chaves primarias
+        column_names = set({})
+        for col in table_columns:
+            if col in table_info['attrs']:
+                column_names.add(col)
+        column_names = column_names.difference(table_pks)
 
         # Escrever os dados no arquivo cypher
         template = env.get_template('vertice_template.j2')
@@ -143,9 +160,11 @@ def gen_vertices():
         data = {
             "table_name": table_name,
             "label": table_info["label"],
-            "column_names": column_names,
+            "column_names": list(column_names),
+            "table_pks": list(table_pks),
         }
 
+        output_file = os.path.join(output_dir, f"{table_name}.cypher")
         with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
             print(template.render(data), file=cypher_file)
         print(f"# VERT: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
@@ -187,6 +206,7 @@ def gen_edges():
             print(f"  Coluna: {relation['from_column']} -> Tabela: {relation['to_table']}, Coluna: {relation['to_column']}")
 
 
-gen_edges()
+gen_vertices()
+# gen_edges()
 print("Exportação concluída!")
 
