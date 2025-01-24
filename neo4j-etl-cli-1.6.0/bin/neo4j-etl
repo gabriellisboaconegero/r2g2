@@ -1,0 +1,8 @@
+#!/bin/bash -e
+
+jarpath="${0%%/neo4j-etl}/../lib"
+
+jars=$(find $jarpath -name *.jar | tr ' \n' ':')
+jars=`echo $jars | sed "s/.$//g"`
+
+java -cp $jars org.neo4j.etl.NeoIntegrationCli "$@" || printf "It seems 'java' command is not available.\nPlease check your JAVA_HOME environment variable.\nAlso check if you have a valid Java 8 environment\n"

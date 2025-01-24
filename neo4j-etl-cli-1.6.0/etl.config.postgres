@@ -1,0 +1,23 @@
+#EXAMPLE - ETL CONFIG FILE
+
+#RDBMS
+rdbms-url=jdbc:postgresql://db:5432/neo4j?ssl=false
+rdbms-password=neo4j
+rdbms-user=neo4j
+rdbms-schema=movies
+
+#NEO4J
+using=cypher:direct
+neo4j-url=bolt://127.0.0.1:7687
+neo4j-user=neo4j
+neo4j-password=teste123
+
+#MISC
+output-mapping-file=/tmp/etl/mapping.json
+import-tool=/var/lib/neo4j/bin
+csv-directory=/tmp/etl
+mapping-file=/tmp/etl/mapping.json
+destination=/var/lib/neo4j/data/databases/graph.db/
+
+force=true
+debug=true

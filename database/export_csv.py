@@ -2,13 +2,30 @@
 import sqlite3
 import csv
 import os
+import sys
 
 # Caminho para o banco de dados SQLite
-db_path = "development.sqlite3"
-output_dir = "csv"  # Diretório para salvar os arquivos CSV
+db_path = "/var/lib/docker/volumes/adegadb-sqlite/_data/development.sqlite3"
+
+if len(sys.argv) == 1:
+    pass
+elif len(sys.argv) == 2:
+    db_path = sys.argv[1]
+else:
+    print(f"Usage: {sys.argv[0]} [file.sqlite3]")
+    exit(1)
+
+print(f"Usando banco: {db_path}")
+root_dir = os.path.dirname(os.path.realpath(__file__))
+output_dir = os.path.join(root_dir, "csv")
+
+if not os.path.exists(db_path):
+    print(f"Banco de dados [{db_path}] não existente")
+    exit(1)
 
 # Certifique-se de que o diretório de saída existe
 os.makedirs(output_dir, exist_ok=True)
+print(f"Gerando diretório: {output_dir}")
 
 # Conectar ao banco de dados
 conn = sqlite3.connect(db_path)

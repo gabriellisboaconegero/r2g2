@@ -5,14 +5,37 @@ services:
       - "7474:7474"
       - "7687:7687"
     volumes:
-        # Persistência de dados
+      # Persistência de dados
       - "./data:/data"
-        # Import de arquivos de diretório no host
+      # Import de arquivos de diretório no host
       - "./import:/import:ro"
-        # Possibilita o uso do apoc-full
-        # https://neo4j.com/docs/apoc/current/installation/
+      # Possibilita o uso do apoc-full
+      # https://neo4j.com/docs/apoc/current/installation/
       - "./plugins:/plugins"
+      # - "./neo4j-etl-cli-1.6.0:/var/lib/neo4j/neo4j-etl-cli:ro"
+      - adegadb-sqlite:/adegadb
+
   chartdb:
     image: ghcr.io/chartdb/chartdb:latest
     ports:
       - "8080:80"
+
+  # db:
+  #   image: postgres
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     - POSTGRES_USER=neo4j
+  #     - POSTGRES_PASSWORD=neo4j
+  #     - POSTGRES_DB=neo4j
+  #     - POSTGRES_HOST_AUTH_METHOD=md5
+  #     - POSTGRES_INITDB_ARGS=--auth-host=md5
+  #   volumes:
+  #     # - ./northwind.sql:/docker-entrypoint-initdb.d/northwind.sql
+  #     - ./sample_db_movies:/docker-entrypoint-initdb.d
+  #     - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+  adegadb-sqlite:
+    external: true
