@@ -17,9 +17,17 @@ def run_cypher_file(file_path):
             session.run(cypher_query)
 
 
-cypher_dir = "cypher"
-for file in os.listdir(cypher_dir):
+root_dir = os.path.dirname(os.path.realpath(__file__))
+cypher_dir = os.path.join(root_dir, "cypher")
+nodes_dir = os.path.join(cypher_dir, "nodes")
+relations_dir = os.path.join(cypher_dir, "relations")
+
+# for file in os.listdir(nodes_dir):
+#     if file.endswith('.cypher'):
+#         run_cypher_file(os.path.join(nodes_dir, file))
+
+for file in os.listdir(relations_dir):
     if file.endswith('.cypher'):
-        run_cypher_file(os.path.join(cypher_dir, file))
+        run_cypher_file(os.path.join(relations_dir, file))
 
 driver.close()

@@ -23,14 +23,14 @@ else:
 print(f"Usando banco: {db_path}")
 root_dir = os.path.dirname(os.path.realpath(__file__))
 output_dir = os.path.join(root_dir, "cypher")
+nodes_dir = os.path.join(output_dir, "nodes")
+relations_dir = os.path.join(output_dir, "relations")
 
 # Certifique-se de que o diretório de saída existe
 os.makedirs(output_dir, exist_ok=True)
+os.makedirs(nodes_dir, exist_ok=True)
+os.makedirs(relations_dir, exist_ok=True)
 print(f"Gerando diretório: {output_dir}")
-
-# Conectar ao banco de dados
-conn = sqlite3.connect(db_path)
-cursor = conn.cursor()
 
 # Informações de quais tabelas importar e quais colunas importar.
 #   "<table>": {
@@ -69,7 +69,7 @@ mapping_info = {
     },
     # ---------- Tabelas Fixas ----------
     # ---------- Tabelas ----------
-    "periodos_letivos": {
+    "periodo_letivos": {
         "attrs": ['ano', 'periodo'],
         "label": "PeriodoLetivo",
     },
@@ -90,7 +90,7 @@ mapping_info = {
         "label": "Historico",
     },
     "alunos": {
-        "attrs": ['registro_Academico', 'nome', 'data_matricula', 'data_conclusao', 'data_colacao'],
+        "attrs": ['registro_academico', 'nome', 'data_matricula', 'data_conclusao', 'data_colacao', 'ira', 'data_colacao'],
         "label": "Aluno",
     },
     "curriculos": {
@@ -133,13 +133,25 @@ def get_table_pk(cursor, table):
     cursor.execute(f"PRAGMA table_info({table})")
     return [row[1] for row in cursor.fetchall() if row[5] == 1]
 
-def gen_vertices():
+def get_table_foreign_info(cursor, table_name):
+    cursor.execute(f"PRAGMA foreign_key_list({table_name});")
+    return [{
+        "from_column": key[3],
+        "to_table": key[2],
+        "to_column": key[4]
+    } for key in cursor.fetchall() if key[2] in mapping_info.keys()]
+
+def gen_nodes():
+    # Conectar ao banco de dados
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
     # Obter todos os nomes de tabelas
     tables = get_tables_name(cursor)
 
     for table_name in tables:
         if table_name not in mapping_info.keys():
-            print(f'! VERT: Tabela {table_name} não tem informações para gerar cypher')
+            print(f'! NODE: Tabela {table_name} não tem informações para gerar cypher')
             continue
         table_info = mapping_info[table_name]
 
@@ -155,7 +167,7 @@ def gen_vertices():
         column_names = column_names.difference(table_pks)
 
         # Escrever os dados no arquivo cypher
-        template = env.get_template('vertice_template.j2')
+        template = env.get_template('node_template.j2')
 
         data = {
             "table_name": table_name,
@@ -164,21 +176,21 @@ def gen_vertices():
             "table_pks": list(table_pks),
         }
 
-        output_file = os.path.join(output_dir, f"{table_name}.cypher")
+        output_file = os.path.join(nodes_dir, f"{table_name}.cypher")
         with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
             print(template.render(data), file=cypher_file)
-        print(f"# VERT: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
+        print(f"# NODE: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
 
     # Fechar a conexão
     conn.close()
 
-def gen_edges():
+def gen_relations():
+    # Conectar ao banco de dados
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Obtém a lista de tabelas
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = [row[0] for row in cursor.fetchall()]
+    # Obter todos os nomes de tabelas
+    tables = get_tables_name(cursor)
 
     foreign_keys = {}
 
@@ -186,27 +198,36 @@ def gen_edges():
     for table_name in tables:
         # Verificaa se é uma das tabelas escolhidas
         if table_name not in mapping_info.keys():
-            print(f'! EDGE: Tabela {table_name} não tem informações para gerar cypher')
+            print(f'! RELATION: Tabela {table_name} não tem informações para gerar cypher')
             continue
 
-        cursor.execute(f"PRAGMA foreign_key_list({table_name});")
-        keys = cursor.fetchall()
-        if keys:
-            if len(list(filter(lambda keys: keys[2] in mapping_info.keys(), keys))) > 0:
-                foreign_keys[table_name] = []
-                for key in keys:
-                    to_table = key[2]
-                    foreign_keys[table_name].append({"from_column": key[3], "to_table": to_table, "to_column": key[4]})
-                    print(f"# EDGE: Arquivo de importação '{table_name}_{to_table}' gerado em.")
+        foreign_keys = get_table_foreign_info(cursor, table_name)
+        # Escrever os dados no arquivo cypher
+        template = env.get_template('relation_template.j2')
+        label1 = mapping_info[table_name]["label"]
+
+        for fk in foreign_keys:
+            to_table = fk["to_table"]
+
+            label2 = mapping_info[to_table]["label"]
+            data = {
+                "table_name": table_name,
+                "table1_label": label1,
+                "table2_label": label2,
+                "from_column": fk["from_column"],
+                "to_column": fk["to_column"],
+                "edge_label": f"{label1}To{label2}",
+            }
+            output_file = os.path.join(relations_dir, f"{table_name}-{to_table}.cypher")
+            with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
+                print(template.render(data), file=cypher_file)
+            print(f"# RELATION: Arquivo de importação '{table_name}-{to_table}' gerado em '{output_file}'.")
 
     conn.close()
-    for table, relations in foreign_keys.items():
-        print(f"Tabela: {table}")
-        for relation in relations:
-            print(f"  Coluna: {relation['from_column']} -> Tabela: {relation['to_table']}, Coluna: {relation['to_column']}")
 
-
-gen_vertices()
-# gen_edges()
+print("# NODE: Gerando arquivos de importação de nodes")
+gen_nodes()
+print("# RELATION: Gerando arquivos de importação de relations")
+gen_relations()
 print("Exportação concluída!")
 

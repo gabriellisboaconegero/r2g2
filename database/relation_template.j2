@@ -1,0 +1,5 @@
+LOAD CSV WITH HEADERS FROM 'file:///{{ table_name }}.csv' as row
+MATCH (x:{{ table1_label }} { id: row.id })
+MATCH (y:{{ table2_label }} { {{ to_column  }}: row.{{ from_column }} })
+MERGE (x)-[:{{ edge_label }}]->(y)
+RETURN x, y;

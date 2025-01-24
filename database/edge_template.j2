@@ -1,4 +1,0 @@
-LOAD CSV WITH HEADERS FROM 'file:///{{ table_name }}.csv' as row
-MATCH (x:{{ table1_label }} {id: row.{{ from_column }}})
-MATCH (y:{{ table2_label }} {id: row.{{ to_column }}})
-MERGE (x)-[:{{ edge_label }}]->(y)
