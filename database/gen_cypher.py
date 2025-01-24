@@ -1,113 +1,50 @@
 #! /usr/bin/python3
 import sqlite3
-import csv
+
 import os
 import sys
+import json
 from jinja2 import Environment, FileSystemLoader
+import argparse
+from urllib.parse import urlparse
 
 # Configuração do jinja2
 file_loader = FileSystemLoader('.')
 env = Environment(loader=file_loader, trim_blocks=True, lstrip_blocks=True)
 
-# Caminho para o banco de dados SQLite
-db_path = "/var/lib/docker/volumes/adegadb-sqlite/_data/development.sqlite3"
+# Configuração da linha de comando
+parser = argparse.ArgumentParser(
+    description="Script para gerar código cypher para importar dados de um banco de dados SQLite ou PostgreSQL para Neo4j"
+)
+parser.add_argument(
+    "--db",
+    choices=["sqlite", "pg"],
+    default="sqlite",
+    help="Tipo de banco de dados (default: sqlite)"
+)
+parser.add_argument(
+    "--out-dir",
+    type=str,
+    default="cypher",
+    help="Diretório de saída para salvar os scripts cypher (default: cypher)"
+)
+parser.add_argument(
+    "--uri",
+    type=str,
+    default="file:development.sqlite3?mode=ro",
+    help="URI de conexão com o banco de dados (default: file:development.sqlite3?mode=ro)"
+)
 
-if len(sys.argv) == 1:
-    pass
-elif len(sys.argv) == 2:
-    db_path = sys.argv[1]
-else:
-    print(f"Usage: {sys.argv[0]} [file.sqlite3]")
-    exit(1)
+args = parser.parse_args()
+print(f"Banco de dados selecionado: {args.db}")
+print(f"Diretório de saída: {args.out_dir}")
+print(f"URI de conexão: {args.uri}")
 
-print(f"Usando banco: {db_path}")
 root_dir = os.path.dirname(os.path.realpath(__file__))
-output_dir = os.path.join(root_dir, "cypher")
+output_dir = os.path.join(root_dir, args.out_dir)
 nodes_dir = os.path.join(output_dir, "nodes")
 relations_dir = os.path.join(output_dir, "relations")
 indexes_dir = os.path.join(output_dir, "indexes")
-
-# Certifique-se de que o diretório de saída existe
-os.makedirs(output_dir, exist_ok=True)
-os.makedirs(nodes_dir, exist_ok=True)
-os.makedirs(relations_dir, exist_ok=True)
-os.makedirs(indexes_dir, exist_ok=True)
-print(f"Gerando diretório: {output_dir}")
-
-# Informações de quais tabelas importar e quais colunas importar.
-#   "<table>": {
-#       "attrs": ['nome', 'peiodo'],
-#       "label": "<Lable>"
-#   }
-mapping_info = {
-    # ---------- Tabelas Fixas ----------
-    "turnos": {
-        "attrs": ['nome'],
-        "label": "Turno",
-    },
-    "graus": {
-        "attrs": ['nome'],
-        "label": "Grau",
-    },
-    "resultado_disciplinas": {
-        "attrs": ['nome'],
-        "label": "ResultadoDisciplina",
-    },
-    "situacao_disciplinas": {
-        "attrs": ['nome'],
-        "label": "SituacaoDisciplina",
-    },
-    "natureza_disciplinas": {
-        "attrs": ['nome'],
-        "label": "NaturezaDisciplina",
-    },
-    "forma_evasaos": {
-        "attrs": ['nome'],
-        "label": "FormaEvasao",
-    },
-    "forma_ingressos": {
-        "attrs": ['nome'],
-        "label": "FormaIngresso",
-    },
-    # ---------- Tabelas Fixas ----------
-    # ---------- Tabelas ----------
-    "periodo_letivos": {
-        "attrs": ['ano', 'periodo'],
-        "label": "PeriodoLetivo",
-    },
-    "cursos": {
-        "attrs": ['nome', 'habilitacao'],
-        "label": "Curso",
-    },
-    "turmas": {
-        "attrs": ['codigo'],
-        "label": "Turma",
-    },
-    "disciplinas": {
-        "attrs": ['nome', 'carga_horaria', 'codigo', 'numero', 'tcc', 'estagio' ],
-        "label": "Disciplina",
-    },
-    "historicos": {
-        "attrs": ['nota', 'frequencia'],
-        "label": "Historico",
-    },
-    "alunos": {
-        "attrs": ['registro_academico', 'nome', 'data_matricula', 'data_conclusao', 'data_colacao', 'ira', 'data_colacao'],
-        "label": "Aluno",
-    },
-    "curriculos": {
-        "attrs": ['nome', 'codigo_externo', 'versao'],
-        "label": "Curriculo",
-    },
-    "grades": {
-        "attrs": ['linha', 'coluna', 'texto'],
-        "label": "Grade",
-    },
-    "elencos": {
-        "attrs": ['codigo', 'nome'],
-        "label": "Elenco",
-    },
-}
 
 def LabelGenerator(label_seed):
     words = label_seed.title().split('_')
@@ -115,47 +52,26 @@ def LabelGenerator(label_seed):
         words[-1] = words[-1][:-1]
     return "".join(words)
 
-def get_tables_name(cursor):
-    cursor.execute("select name from pragma_table_list where schema='main'")
-    return [row[0] for row in cursor.fetchall()]
+def get_tables_name(database_info):
+    return [table["table"] for table in database_info["tables"]]
 
-# 'PRAGMA table_info({table})' schema:
-#  0     1      2        3            4          5
-# cid | name | type | notnull | default_value | pk
-# Retirado de https://www.sqlite.org/pragma.html#pragma_table_info
-# """
-# This pragma returns one row for each normal column in the named table. Columns in the result set include:
-# "name" (its name);
-# "type" (data type if given, else '');
-# "notnull" (whether or not the column can be NULL);
-# "dflt_value" (the default value for the column); and
-# "pk" (either zero for columns that are not part of the primary key, or the 1-based index of the column within the primary key).
+def get_table_columns(database_info, table_name):
+    return [col["name"] for col in database_info["columns"] if col["table"] == table_name]
 
-# The "cid" column should not be taken to mean more than "rank within the current result set".
-# """
-def get_table_columns(cursor, table):
-    cursor.execute(f"PRAGMA table_info({table})")
-    return [row[1] for row in cursor.fetchall()]
 
-def get_table_pk(cursor, table):
-    cursor.execute(f"PRAGMA table_info({table})")
-    return [row[1] for row in cursor.fetchall() if row[5] == 1]
+def get_table_pk(database_info, table_name):
+    return [pk["column"] for pk in database_info["pk_info"] if pk["table"] == table_name]
 
-def get_table_foreign_info(cursor, table_name):
-    cursor.execute(f"PRAGMA foreign_key_list({table_name});")
+def get_table_foreign_info(database_info, table_name):
     return [{
-        "from_column": key[3],
-        "to_table": key[2],
-        "to_column": key[4]
-    } for key in cursor.fetchall() if key[2] in mapping_info.keys()]
+        "from_column": fk["column"],
+        "to_table": fk["reference_table"],
+        "to_column": fk["reference_column"],
+    } for fk in database_info["fk_info"] if fk["table"] == table_name]
 
-def gen_nodes():
-    # Conectar ao banco de dados
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
+def gen_nodes(database_info):
     # Obter todos os nomes de tabelas
-    tables = get_tables_name(cursor)
+    tables = get_tables_name(database_info)
     template = env.get_template('node_template.j2')
 
     for table_name in tables:
@@ -163,8 +79,8 @@ def gen_nodes():
         #     print(f'! NODE: Tabela {table_name} não tem informações para gerar cypher')
         #     continue
 
-        table_pks = get_table_pk(cursor, table_name)
-        table_columns = get_table_columns(cursor, table_name)
+        table_pks = get_table_pk(database_info, table_name)
+        table_columns = get_table_columns(database_info, table_name)
         column_names = list(set(table_columns).difference(set(table_pks)))
 
         # Escrever os dados no arquivo cypher
@@ -184,16 +100,9 @@ def gen_nodes():
         else:
             print(f"! NODE: Tabela {table_name} não tem chave primária.")
 
-    # Fechar a conexão
-    conn.close()
-
-def gen_relations():
-    # Conectar ao banco de dados
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
+def gen_relations(database_info):
     # Obter todos os nomes de tabelas
-    tables = get_tables_name(cursor)
+    tables = get_tables_name(database_info)
     template = env.get_template('relation_template.j2')
 
     foreign_keys = {}
@@ -205,7 +114,7 @@ def gen_relations():
         #     print(f'! RELATION: Tabela {table_name} não tem informações para gerar cypher')
         #     continue
 
-        foreign_keys = get_table_foreign_info(cursor, table_name)
+        foreign_keys = get_table_foreign_info(database_info, table_name)
         # Escrever os dados no arquivo cypher
         label1 = LabelGenerator(table_name)
 
@@ -225,15 +134,9 @@ def gen_relations():
                 print(template.render(data), file=cypher_file)
             print(f"# RELATION: Arquivo de importação '{table_name}-{to_table}' gerado em '{output_file}'.")
 
-    conn.close()
-
-def gen_indexes():
-    # Conectar ao banco de dados
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
+def gen_indexes(database_info):
     # Obter todos os nomes de tabelas
-    tables = get_tables_name(cursor)
+    tables = get_tables_name(database_info)
     template = env.get_template('node_index_template.j2')
 
     # Pega informações sobre as relações, apenas de tabela que estão nas tabelas selecionadas
@@ -243,7 +146,7 @@ def gen_indexes():
         #     print(f'! INDEX: Tabela {table_name} não tem informações para gerar cypher')
         #     continue
 
-        table_pks = get_table_pk(cursor, table_name)
+        table_pks = get_table_pk(database_info, table_name)
         # Escrever os dados no arquivo cypher
         data = {
             "table_name": table_name,
@@ -259,14 +162,44 @@ def gen_indexes():
         else:
             print(f"! INDEX: Tabela {table_name} não tem chave primária.")
 
+
+def get_sqlite_database_info():
+    with open('get_sqlite_database_info.sql', 'r') as sql_file:
+        sql_script = sql_file.read()
+
+    database_info = {}
+    result = urlparse(args.uri)
+    if not os.path.exists(result.path):
+        print(f"[ERRO]: URI [{args.uri}] incorreta, arquivo do banco {result.path} não existe")
+        exit(1)
+    conn = sqlite3.connect(args.uri, uri=True)
+    cursor = conn.cursor()
+    cursor.execute(sql_script)
+    database_info = json.loads(cursor.fetchone()[0])
     conn.close()
 
+    return database_info
+
+def get_database_info():
+    if args.db == "sqlite":
+        return get_sqlite_database_info()
+    else:
+        print("[ERRO]: Não deveria chegar aqui")
+        exit(1)
+
+database_info = get_database_info()
+
+# Certifique-se de que o diretório de saída existe
+os.makedirs(output_dir, exist_ok=True)
+os.makedirs(nodes_dir, exist_ok=True)
+os.makedirs(relations_dir, exist_ok=True)
+os.makedirs(indexes_dir, exist_ok=True)
 
 print("# NODE: Gerando arquivos de importação de nodes")
-gen_nodes()
+gen_nodes(database_info)
 print("# INDEX: Gerando arquivos de importação dos indexes")
-gen_indexes()
+gen_indexes(database_info)
 print("# RELATION: Gerando arquivos de importação de relations")
-gen_relations()
+gen_relations(database_info)
 print("Exportação concluída!")
 
