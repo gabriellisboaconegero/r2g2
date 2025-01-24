@@ -25,11 +25,13 @@ root_dir = os.path.dirname(os.path.realpath(__file__))
 output_dir = os.path.join(root_dir, "cypher")
 nodes_dir = os.path.join(output_dir, "nodes")
 relations_dir = os.path.join(output_dir, "relations")
+indexes_dir = os.path.join(output_dir, "indexes")
 
 # Certifique-se de que o diretório de saída existe
 os.makedirs(output_dir, exist_ok=True)
 os.makedirs(nodes_dir, exist_ok=True)
 os.makedirs(relations_dir, exist_ok=True)
+os.makedirs(indexes_dir, exist_ok=True)
 print(f"Gerando diretório: {output_dir}")
 
 # Informações de quais tabelas importar e quais colunas importar.
@@ -225,8 +227,42 @@ def gen_relations():
 
     conn.close()
 
+def gen_indexes():
+    # Conectar ao banco de dados
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Obter todos os nomes de tabelas
+    tables = get_tables_name(cursor)
+
+    # Pega informações sobre as relações, apenas de tabela que estão nas tabelas selecionadas
+    for table_name in tables:
+        # Verificaa se é uma das tabelas escolhidas
+        if table_name not in mapping_info.keys():
+            print(f'! INDEX: Tabela {table_name} não tem informações para gerar cypher')
+            continue
+
+        table_pks = get_table_pk(cursor, table_name)
+        # Escrever os dados no arquivo cypher
+        template = env.get_template('node_index_template.j2')
+        data = {
+            "table_name": table_name,
+            "label": mapping_info[table_name]["label"],
+            "table_pks": table_pks,
+        }
+
+        output_file = os.path.join(indexes_dir, f"{table_name}.cypher")
+        with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
+            print(template.render(data), file=cypher_file)
+        print(f"# INDEX: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
+
+    conn.close()
+
+
 print("# NODE: Gerando arquivos de importação de nodes")
 gen_nodes()
+print("# INDEX: Gerando arquivos de importação dos indexes")
+gen_indexes()
 print("# RELATION: Gerando arquivos de importação de relations")
 gen_relations()
 print("Exportação concluída!")

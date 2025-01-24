@@ -9,6 +9,12 @@ password = "teste123"
 
 driver = GraphDatabase.driver(uri, auth=(username, password))
 
+root_dir = os.path.dirname(os.path.realpath(__file__))
+cypher_dir = os.path.join(root_dir, "cypher")
+nodes_dir = os.path.join(cypher_dir, "nodes")
+relations_dir = os.path.join(cypher_dir, "relations")
+indexes_dir = os.path.join(cypher_dir, "indexes")
+
 def run_cypher_file(file_path):
     print(f"Rodando {file_path}")
     with driver.session() as session:
@@ -16,18 +22,13 @@ def run_cypher_file(file_path):
             cypher_query = file.read()
             session.run(cypher_query)
 
+def run_migration(migration_dir):
+    for file in os.listdir(migration_dir):
+        if file.endswith('.cypher'):
+            run_cypher_file(os.path.join(migration_dir, file))
 
-root_dir = os.path.dirname(os.path.realpath(__file__))
-cypher_dir = os.path.join(root_dir, "cypher")
-nodes_dir = os.path.join(cypher_dir, "nodes")
-relations_dir = os.path.join(cypher_dir, "relations")
-
-# for file in os.listdir(nodes_dir):
-#     if file.endswith('.cypher'):
-#         run_cypher_file(os.path.join(nodes_dir, file))
-
-for file in os.listdir(relations_dir):
-    if file.endswith('.cypher'):
-        run_cypher_file(os.path.join(relations_dir, file))
+run_migration(indexes_dir)
+run_migration(nodes_dir)
+run_migration(relations_dir)
 
 driver.close()
