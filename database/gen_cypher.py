@@ -109,6 +109,12 @@ mapping_info = {
     },
 }
 
+def LabelGenerator(label_seed):
+    words = label_seed.title().split('_')
+    if words[-1][-1] == 's':
+        words[-1] = words[-1][:-1]
+    return "".join(words)
+
 def get_tables_name(cursor):
     cursor.execute("select name from pragma_table_list where schema='main'")
     return [row[0] for row in cursor.fetchall()]
@@ -150,38 +156,33 @@ def gen_nodes():
 
     # Obter todos os nomes de tabelas
     tables = get_tables_name(cursor)
+    template = env.get_template('node_template.j2')
 
     for table_name in tables:
-        if table_name not in mapping_info.keys():
-            print(f'! NODE: Tabela {table_name} não tem informações para gerar cypher')
-            continue
-        table_info = mapping_info[table_name]
+        # if table_name not in mapping_info.keys():
+        #     print(f'! NODE: Tabela {table_name} não tem informações para gerar cypher')
+        #     continue
 
+        table_pks = get_table_pk(cursor, table_name)
         table_columns = get_table_columns(cursor, table_name)
-        table_pks = set(get_table_pk(cursor, table_name))
-
-        # Obter os nomes das colunas que estão em mapping_info da tabela da itração
-        # e retira as que são chaves primarias
-        column_names = set({})
-        for col in table_columns:
-            if col in table_info['attrs']:
-                column_names.add(col)
-        column_names = column_names.difference(table_pks)
+        column_names = list(set(table_columns).difference(set(table_pks)))
 
         # Escrever os dados no arquivo cypher
-        template = env.get_template('node_template.j2')
 
         data = {
             "table_name": table_name,
-            "label": table_info["label"],
-            "column_names": list(column_names),
-            "table_pks": list(table_pks),
+            "label": LabelGenerator(table_name),
+            "column_names": column_names,
+            "table_pks": table_pks,
         }
 
-        output_file = os.path.join(nodes_dir, f"{table_name}.cypher")
-        with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
-            print(template.render(data), file=cypher_file)
-        print(f"# NODE: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
+        if len(table_pks) > 0:
+            output_file = os.path.join(nodes_dir, f"{table_name}.cypher")
+            with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
+                print(template.render(data), file=cypher_file)
+            print(f"# NODE: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
+        else:
+            print(f"! NODE: Tabela {table_name} não tem chave primária.")
 
     # Fechar a conexão
     conn.close()
@@ -193,25 +194,24 @@ def gen_relations():
 
     # Obter todos os nomes de tabelas
     tables = get_tables_name(cursor)
+    template = env.get_template('relation_template.j2')
 
     foreign_keys = {}
 
     # Pega informações sobre as relações, apenas de tabela que estão nas tabelas selecionadas
     for table_name in tables:
         # Verificaa se é uma das tabelas escolhidas
-        if table_name not in mapping_info.keys():
-            print(f'! RELATION: Tabela {table_name} não tem informações para gerar cypher')
-            continue
+        # if table_name not in mapping_info.keys():
+        #     print(f'! RELATION: Tabela {table_name} não tem informações para gerar cypher')
+        #     continue
 
         foreign_keys = get_table_foreign_info(cursor, table_name)
         # Escrever os dados no arquivo cypher
-        template = env.get_template('relation_template.j2')
-        label1 = mapping_info[table_name]["label"]
+        label1 = LabelGenerator(table_name)
 
         for fk in foreign_keys:
             to_table = fk["to_table"]
-
-            label2 = mapping_info[to_table]["label"]
+            label2 = LabelGenerator(to_table)
             data = {
                 "table_name": table_name,
                 "table1_label": label1,
@@ -234,27 +234,30 @@ def gen_indexes():
 
     # Obter todos os nomes de tabelas
     tables = get_tables_name(cursor)
+    template = env.get_template('node_index_template.j2')
 
     # Pega informações sobre as relações, apenas de tabela que estão nas tabelas selecionadas
     for table_name in tables:
         # Verificaa se é uma das tabelas escolhidas
-        if table_name not in mapping_info.keys():
-            print(f'! INDEX: Tabela {table_name} não tem informações para gerar cypher')
-            continue
+        # if table_name not in mapping_info.keys():
+        #     print(f'! INDEX: Tabela {table_name} não tem informações para gerar cypher')
+        #     continue
 
         table_pks = get_table_pk(cursor, table_name)
         # Escrever os dados no arquivo cypher
-        template = env.get_template('node_index_template.j2')
         data = {
             "table_name": table_name,
-            "label": mapping_info[table_name]["label"],
+            "label": LabelGenerator(table_name),
             "table_pks": table_pks,
         }
 
-        output_file = os.path.join(indexes_dir, f"{table_name}.cypher")
-        with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
-            print(template.render(data), file=cypher_file)
-        print(f"# INDEX: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
+        if len(table_pks) > 0:
+            output_file = os.path.join(indexes_dir, f"{table_name}.cypher")
+            with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
+                print(template.render(data), file=cypher_file)
+            print(f"# INDEX: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
+        else:
+            print(f"! INDEX: Tabela {table_name} não tem chave primária.")
 
     conn.close()
 
