@@ -9,12 +9,26 @@ e colocar no container do neo4j. Minha solução, baixar na minha máquina e mon
 
 2. Para poder usar com sqlite3 é preciso baixar o driver de conexão jdbc do sqlite3. [https://github.com/xerial/sqlite-jdbc/releases](https://github.com/xerial/sqlite-jdbc/releases). Coloque no diretório `neo4j-etl-cli-1.6.0`.
 
-3. Paara executar o neo4j-etl é preciso estar no mesmo diretório que o diretório `bin/`, então `cd neo4j-etl-cli-1.6.0`.
+3. Para executar o neo4j-etl é preciso estar no mesmo diretório que o diretório `bin/`, então `cd neo4j-etl-cli-1.6.0`.
 
-4. Para que o neo4j-etl tenha acesso ao banco do sqlite3, monte o banco do adega na raiz do container. Assim
-a ferramenta pode acessar o banco pela conexão jdbc `jdbc:sqlite:/adegadb/development.sqlite3`.
+4. Para que o neo4j-etl tenha acesso ao banco do sqlite3, monte o banco do adega na raiz do container. Assim a ferramenta pode acessar o banco pela conexão jdbc `jdbc:sqlite:/adegadb/development.sqlite3`.
 
 5. Dois arquivos de configuração estão prontos, um para cada banco (ATENÇÃO: Nenhum deles funciona).
+
+```
+unzip neo4j-etl-cli-<version>.zip
+cp neo4j-etl-configs/etl.* neo4j-etl-cli-<version>
+cp neo4j-etl-configs/sqlite-jdbc-3.48.0.0.jar neo4j-etl-cli-<version>/lib/
+
+# Lembre de montar o volume do 'neo4j-etl-cli-<version>' no serviço 'neo4j' no docker-compose.yml
+docker compose up -d
+docker compose exec -it neo4j bash
+cd neo4j-etl-cli-<version>
+mkdir -p /tmp/etl
+
+# Escolher o arquivo de configuração baseado no banco de dados
+./bin/neo4j-elt <command> --config-file etl.config.<db>
+```
 
 # Problemas
 Antes de executar o `neo4j-etl export` é preciso gerar o mapeamento.
