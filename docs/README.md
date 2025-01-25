@@ -1,26 +1,53 @@
-# Usando neo4j localmente
-É possível utilizar o banco de dados do neo4j e um browser localmente.
-- Para criar o conatiner.
-- Imports mapeados para `datasets`
-```shell
-docker run -d --name neo4j -p 7474:7474 -p 7687:7687 -v /$HOME/neo4j:/data neo4j -v /$HOME/neo4j/datasets:/var/lib/neo4j/import
+# O importador para o neo4j (SQLite & PostgresSQL)
+A ferramenta permite importar um banco de dados relacional dos bancos `SQLite` e `PostgresSQL`
+para o `Neo4j`.
+
+A importação é feita exatamente como está no banco e o mapeamento segue as seguintes regras
+1. Uma linha é um **Node**.
+2. Um nome de uma tabela é um **Label**.
+3. Um par de chave primária e chave estrangeira é uma **Relation**.
+4. As propriedades de um **Node** são os atributos que a tabela de nome **Label** tinha, menos as chaves estrangeiras.
+5. Relations não tem atributos. Derivada de 3. e 1., pois como toda tabela vira **Nodes** e **Relations**
+são a conexão entre as chaves então a **Relation** não vai ter atributos.
+6. Todo **Node** tem um conjunto de atributos únicos.
+7. Todo **Label** tem um index em cima do atributos que eram chave primária no modelo relacional.
+8. Toda tabela sem chave primária tem adicionada um chave primária intermediária `row_id`.
+9. O **Label** de uma **Relation** é a concatenação dos labels de seus **Nodes** com `To` no meio.
+
+# Executando
+Esse ambiente foi criado para utilizar docker e facilitar o desenvolvimento. No ambiente existem um projeto
+docker compose que inicia o `Neo4j`, `ChartDB.io` e um banco `PostgresSQL`. O banco do ADEGA precisa ser levantado manualmente seguindo as instruções do próprio ADEGA.
+Suba os containers com
 ```
-- Para próximas execuções executar
-```shell
-docker start neo4j
+docker compose up -d
+```
+Dentro do diretório `database` são encontradas as ferramentas que fazem a importação, elas vão gerar os scripts `Cypher` e os arquivos csv
+para realizar a importação do banco.
+São duas ferramentas principais
+- `gen_import_context.py`
+- `run_migrations.py`
+A primeira é reponsável por criar os scripts `Cypher` e os arquivos csv das tabelas do banco.
+```
+# Ative o ambiente virtual
+source database/.env/bin/activate
+
+# Rode o script. --help para melhor explicação do funcionamento dele
+python3 database/gen_import_context.py --help
 ```
 
-- Para parar o neo4j
-```shell
-docker stop neo4j
+Após os scripts e arquivos csv estarem criados é preciso dar acesso aos arquivos csv para o `Neo4j`. Para isso o arquivos dentro de `database/<context>/csv` devem ser copiados para `import/<context>`.
+```
+mkdir -p import/<context>
+cp database/<context>/csv/* import/<context>
 ```
 
-## Carregando dados no neo4j
-É possível carregar uma base de dados relacional no neo4j de diversas formas
-- `LOAD` command. https://neo4j.com/docs/cypher-manual/current/clauses/load-csv/
-- `neo4j-admin database import`. https://neo4j.com/docs/operations-manual/current/tools/neo4j-admin/neo4j-admin-import/#_overview
-- https://neo4j.com/docs/getting-started/appendix/tutorials/guide-import-relational-and-etl/
-- https://github.com/neo4j-contrib/neo4j-etl. (Ferramente de migração de relational database para neo4j)
+Agora que o `Neo4j` tem acesso à eles basta executar os scripts
+```
+# --help, leia nates de executar
+python3 database/run_migrations.py --help
+```
 
-# Links úteis
-- https://neo4j.com/docs/graph-data-science/current/algorithms/
+# Usando o `ChatDB.io`
+Siga o passo a passo para visualizar um novo banco e depois importe ele para o `Neo4j` seguindo os
+passos anteriores e confira se os esquema batem.
+PS: O script para obter informações dos bancos do `ChatDB.io` é o mesmo utilizado pelas ferramentas. Peguei emprestado :)
