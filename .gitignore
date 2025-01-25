@@ -1,9 +1,5 @@
 data
-database/.env/
-database/csv/
-database/cypher/
-database/pg/
-database/sqlite/
+exporter/.env/
 
 import/*
 

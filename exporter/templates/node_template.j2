@@ -1,0 +1,14 @@
+LOAD CSV WITH HEADERS FROM 'file:///{{ prefix }}{{ table_name }}.csv' AS row
+MERGE (x:{{ label }} {
+{%- for pk in table_pks[:-1] -%}
+{{ pk }}: row.{{ pk }},
+{%- endfor -%}
+{{ table_pks[-1] }}: row.{{ table_pks[-1] }}})
+{% if column_names | length > 0 %}
+ON CREATE SET
+    {% for col in column_names[:-1] %}
+    x.{{ col }} = row.{{ col }},
+    {% endfor %}
+    x.{{ column_names[-1] }} = row.{{ column_names[-1] }}
+{% endif %}
+RETURN x;

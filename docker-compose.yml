@@ -31,8 +31,9 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=md5
       - POSTGRES_INITDB_ARGS=--auth-host=md5
     volumes:
-      # - ./northwind.sql:/docker-entrypoint-initdb.d/northwind.sql
-      - ./sample_db_movies:/docker-entrypoint-initdb.d
+      # Configure qual sample você vai usar com
+      # - ./samples/<sample>/postgres:/docker-entrypoint-initdb.d
+      - ./samples/sample_db_movies/postgres:/docker-entrypoint-initdb.d
       - pgdata:/var/lib/postgresql/data
 
 volumes:
