@@ -2,4 +2,9 @@ data
 database/.env/
 database/csv/
 database/cypher/
+database/pg/
+database/sqlite/
 
+import/*
+
+neo4j-etl-cli-1.6.0/

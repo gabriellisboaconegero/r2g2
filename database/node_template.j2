@@ -1,4 +1,4 @@
-LOAD CSV WITH HEADERS FROM 'file:///{{ table_name }}.csv' AS row
+LOAD CSV WITH HEADERS FROM 'file:///{{ prefix }}{{ table_name }}.csv' AS row
 MERGE (x:{{ label }} {
 {%- for pk in table_pks[:-1] -%}
 {{ pk }}: row.{{ pk }},
