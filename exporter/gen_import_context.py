@@ -170,9 +170,7 @@ def gen_indexes(database_info):
 
     # Pega informações sobre as relações, apenas de tabela que estão nas tabelas selecionadas
     for table_name in tables:
-        print(f"Table: {table_name}")
         table_pks = get_table_pk(database_info, table_name)
-        print(table_pks)
 
         data = {
             "table_name": table_name,

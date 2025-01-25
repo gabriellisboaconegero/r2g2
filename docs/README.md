@@ -5,14 +5,14 @@ para o `Neo4j`.
 A importação é feita exatamente como está no banco e o mapeamento segue as seguintes regras
 1. Uma linha é um **Node**.
 2. Um nome de uma tabela é um **Label**.
-3. Um par de chave primária e chave estrangeira é uma **Relation**.
+3. Toda chave estrangeira é uma **Relation**.
 4. As propriedades de um **Node** são os atributos que a tabela de nome **Label** tinha, menos as chaves estrangeiras.
 5. Relations não tem atributos. Derivada de 3. e 1., pois como toda tabela vira **Nodes** e **Relations**
 são a conexão entre as chaves então a **Relation** não vai ter atributos.
 6. Todo **Node** tem um conjunto de atributos únicos.
 7. Todo **Label** tem um index em cima do atributos que eram chave primária no modelo relacional.
 8. Toda tabela sem chave primária tem adicionada um chave primária intermediária `row_id`.
-9. O **Label** de uma **Relation** é a concatenação dos labels de seus **Nodes** com `To` no meio.
+9. O **Label** de uma **Relation** é o nome que o rdbms atribuiu para a chave primária.
 
 # Executando
 Esse ambiente foi criado para utilizar docker e facilitar o desenvolvimento. No ambiente existem um projeto
@@ -21,25 +21,31 @@ Suba os containers com
 ```
 docker compose up -d
 ```
-Dentro do diretório `database` são encontradas as ferramentas que fazem a importação, elas vão gerar os scripts `Cypher` e os arquivos csv
+Dentro do diretório `exporter` são encontradas as ferramentas que fazem a importação, elas vão gerar os scripts `Cypher` e os arquivos csv
 para realizar a importação do banco.
 São duas ferramentas principais
 - `gen_import_context.py`
 - `run_migrations.py`
 A primeira é reponsável por criar os scripts `Cypher` e os arquivos csv das tabelas do banco.
 ```
-# Ative o ambiente virtual
-source database/.env/bin/activate
+# Crie um ambiente virtual e instale os pacotes
+cd exporter
+python3 -m venv .env
+source .env/bin/activate
+pip install -r requirements.txt
 
 # Rode o script. --help para melhor explicação do funcionamento dele
-python3 database/gen_import_context.py --help
+python3 gen_import_context.py --help
 ```
+PS: Um contexto é apenas o diretório que vai centralizar os scripts e ser usado como caminho relativo
+dentro dos scripts `Cypher` para faze o `LOAD CSV`. Ele ajuda a organizar melhor cada importação.
 
-Após os scripts e arquivos csv estarem criados é preciso dar acesso aos arquivos csv para o `Neo4j`. Para isso o arquivos dentro de `database/<context>/csv` devem ser copiados para `import/<context>`.
+Após os scripts e arquivos csv estarem criados é preciso dar acesso aos arquivos csv para o `Neo4j`. Para isso o arquivo `exporter/<context>` deve ser copiado para `import/`.
 ```
-mkdir -p import/<context>
-cp database/<context>/csv/* import/<context>
+cp -r exporter/<context> import
 ```
+PS: Da para usar a flag `--out-dir import` para adicionar o diretório do contexto em `import`. E usar
+`--context-dir import` para indicar o diretório que o contexto está para `run_migrations.py`
 
 Agora que o `Neo4j` tem acesso à eles basta executar os scripts
 ```
