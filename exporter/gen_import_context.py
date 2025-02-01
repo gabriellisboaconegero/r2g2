@@ -53,6 +53,7 @@ print(f"Diretório de saída: {args.context}")
 print(f"URI de conexão: {args.uri}")
 
 ROW_ID = "row_id"
+MIGRATE_ALL_FILENAME = "migrate"
 
 # Arquivos internos
 templates_dir = os.path.join(root_dir, "templates")
@@ -126,6 +127,9 @@ def gen_nodes(database_info):
         output_file = os.path.join(nodes_dir, f"{table_name}.cypher")
         with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
             print(template.render(data), file=cypher_file)
+
+        # Escreve dados no arquivo de migração geral
+        print(template.render(data), file=MIGRATE_ALL_FILE)
         print(f"# NODE: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
 
 def gen_relations(database_info):
@@ -161,6 +165,9 @@ def gen_relations(database_info):
             output_file = os.path.join(relations_dir, f"{fk_name}.cypher")
             with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
                 print(template.render(data), file=cypher_file)
+
+            # Escreve dados no arquivo de migração geral
+            print(template.render(data), file=MIGRATE_ALL_FILE)
             print(f"# RELATION: Arquivo de importação '{fk_name}' gerado em '{output_file}'.")
 
 def gen_indexes(database_info):
@@ -182,6 +189,10 @@ def gen_indexes(database_info):
         output_file = os.path.join(indexes_dir, f"{table_name}.cypher")
         with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
             print(template.render(data), file=cypher_file)
+
+        # Escreve dados no arquivo de migração geral
+        print(template.render(data), file=MIGRATE_ALL_FILE)
+
         print(f"# INDEX: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
 
 # Pega os metadados sobre o banco de dados e armazena em um json
@@ -299,11 +310,24 @@ database_info = get_database_info()
 if args.dump:
     dump_database_csv(database_info)
 
-print("# NODE: Gerando arquivos de importação de nodes")
-gen_nodes(database_info)
+
+MIGRATE_ALL_FILEPATH = os.path.join(output_dir, f"{MIGRATE_ALL_FILENAME}.cypher")
+MIGRATE_ALL_FILE = open(MIGRATE_ALL_FILEPATH, mode="w", newline="", encoding="utf-8")
+
 print("# INDEX: Gerando arquivos de importação dos indexes")
 gen_indexes(database_info)
+
+# Espera para que todos os indexes sejam criados, ja que são criados assincronos
+print("CALL db.awaitIndexes();", file=MIGRATE_ALL_FILE)
+
+print("# NODE: Gerando arquivos de importação de nodes")
+gen_nodes(database_info)
+
 print("# RELATION: Gerando arquivos de importação de relations")
 gen_relations(database_info)
+
+MIGRATE_ALL_FILE.close()
+
+print(f"Arquivo de transferência completo gerado em '{MIGRATE_ALL_FILEPATH}'")
 print("Exportação concluída!")
 

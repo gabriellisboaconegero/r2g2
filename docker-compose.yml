@@ -13,7 +13,7 @@ services:
       # https://neo4j.com/docs/apoc/current/installation/
       - "./plugins:/plugins"
       - "./neo4j-etl-cli-1.6.0:/var/lib/neo4j/neo4j-etl-cli"
-      - adegadb-sqlite:/adegadb
+      # - adegadb-sqlite:/adegadb
 
   chartdb:
     image: ghcr.io/chartdb/chartdb:latest

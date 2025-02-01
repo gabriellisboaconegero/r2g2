@@ -10,5 +10,4 @@ ON CREATE SET
     x.{{ col }} = row.{{ col }},
     {% endfor %}
     x.{{ column_names[-1] }} = row.{{ column_names[-1] }}
-{% endif %}
-RETURN x;
+{%- endif -%};

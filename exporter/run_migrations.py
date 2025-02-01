@@ -1,6 +1,7 @@
 import os
 import argparse
 from neo4j import GraphDatabase
+import time
 
 root_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -43,6 +44,7 @@ print(f"Diretório de scripts: {args.context}")
 print(f"URI de conexão: {args.uri}")
 print(f"Usuário de conexão: {args.user}")
 
+
 # Arquivos internos
 templates_dir = os.path.join(root_dir, "templates")
 sql_dir = os.path.join(root_dir, "sql")
@@ -56,20 +58,41 @@ csv_dir = os.path.join(output_dir, "csv")
 
 driver = GraphDatabase.driver(args.uri, auth=(args.user, args.password))
 
+total_time = 0
+total_summary = {
+    'nodes_created': 0,
+    'relationships_created': 0,
+}
+
 def run_cypher_file(file_path):
-    print(f"Rodando {file_path}")
+    global total_time, total_nodes_created, total_relations_created
     with driver.session() as session:
         with open(file_path, "r") as file:
             cypher_query = file.read()
-            session.run(cypher_query)
+            inicio = time.time()
+            summary = session.run(cypher_query).consume().counters
+            fim = time.time()
+            exec_time = fim - inicio
+
+            total_time += exec_time
+            total_summary['nodes_created'] += summary.nodes_created
+            total_summary['relationships_created'] += summary.relationships_created
+
+            return (summary, exec_time)
 
 def run_migration(migration_dir):
     for file in os.listdir(migration_dir):
         if file.endswith('.cypher'):
-            run_cypher_file(os.path.join(migration_dir, file))
+            file_path = os.path.join(migration_dir, file)
+            print(f"Rodando: {file_path}")
+            summary, exec_time = run_cypher_file(file_path)
+            print(f"Sumario: {summary}")
+            print(f"Tempo: {exec_time:.4f} segundos")
 
 run_migration(indexes_dir)
 run_migration(nodes_dir)
 run_migration(relations_dir)
 
+print(f"Tempo de execução total: {total_time}")
+print(f"Sumario final: {total_summary}")
 driver.close()

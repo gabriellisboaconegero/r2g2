@@ -5,5 +5,4 @@ MATCH (x:{{ table1_label }} {
 {%- endfor -%}
 {{ table_pks[-1] }}: row.{{ table_pks[-1] }}})
 MATCH (y:{{ table2_label }} { {{ to_column  }}: row.{{ from_column }} })
-MERGE (x)-[:{{ edge_label }}]->(y)
-RETURN x, y;
+MERGE (x)-[:{{ edge_label }}]->(y);
