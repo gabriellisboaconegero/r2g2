@@ -255,7 +255,7 @@ def sqlite_dump(database_info):
             rows[i] = (i,)+row
 
         with open(output_file, mode="w", newline="", encoding="utf-8") as csv_file:
-            writer = csv.writer(csv_file)
+            writer = csv.writer(csv_file, quotechar="'")
             writer.writerow(table_columns)
             writer.writerows(rows)
         print(f"# DUMP: Fazendo dump da tabela '{table}' em '{output_file}'")
