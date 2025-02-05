@@ -4,15 +4,19 @@ para o `Neo4j`.
 
 A importação é feita exatamente como está no banco e o mapeamento segue as seguintes regras
 1. Uma linha é um **Node**.
+    1. As propriedades de um **Node** são os atributos que a tabela de nome **Label** tinha, menos as chaves estrangeiras.
+    2. Todo **Node** tem um conjunto de atributos únicos.
 2. Um nome de uma tabela é um **Label**.
 3. Toda chave estrangeira é uma **Relation**.
-4. As propriedades de um **Node** são os atributos que a tabela de nome **Label** tinha, menos as chaves estrangeiras.
-5. Relations não tem atributos. Derivada de 3. e 1., pois como toda tabela vira **Nodes** e **Relations**
+    1. O **Label** de uma **Relation** é o nome que o rdbms atribuiu para a chave estrangeira.
+4. Relations não tem atributos. Derivada de 3. e 1., pois como toda tabela vira **Nodes** e **Relations**
 são a conexão entre as chaves então a **Relation** não vai ter atributos.
-6. Todo **Node** tem um conjunto de atributos únicos.
-7. Todo **Label** tem um index em cima do atributos que eram chave primária no modelo relacional.
-8. Toda tabela sem chave primária tem adicionada um chave primária intermediária `row_id`.
-9. O **Label** de uma **Relation** é o nome que o rdbms atribuiu para a chave primária.
+5. Todo **Label** tem um index em cima do atributos que eram chave primária no modelo relacional.
+6. Toda tabela sem chave primária tem adicionada um chave primária intermediária `row_id`.
+    1. Remover o `row_id`?
+
+
+Citar indexes primeiro?
 
 # Executando
 Esse ambiente foi criado para utilizar docker e facilitar o desenvolvimento. No ambiente existem um projeto

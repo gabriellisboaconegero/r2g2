@@ -52,7 +52,7 @@ print(f"Banco de dados selecionado: {args.db}")
 print(f"Diretório de saída: {args.context}")
 print(f"URI de conexão: {args.uri}")
 
-ROW_ID = "row_id"
+ROW_ID = "technical_pk"
 MIGRATE_ALL_FILENAME = "migrate"
 
 # Arquivos internos
@@ -91,9 +91,6 @@ def get_table_pk(database_info, table_name):
         pks += [ROW_ID]
     return pks
 
-def get_table_fk(database_info, table_name):
-    return [pk["column"] for pk in database_info["fk_info"] if pk["table"] == table_name]
-
 def get_table_foreign_info(database_info, table_name):
     return [{
         "from_column": fk["column"],
@@ -102,6 +99,15 @@ def get_table_foreign_info(database_info, table_name):
         "fk_name": fk["foreign_key_name"],
     } for fk in database_info["fk_info"] if fk["table"] == table_name]
 
+def get_foreign_info(database_info):
+    return [{
+        "from_table": fk["table"],
+        "from_column": fk["column"],
+        "to_table": fk["reference_table"],
+        "to_column": fk["reference_column"],
+        "fk_name": fk["foreign_key_name"],
+    } for fk in database_info["fk_info"]]
+
 def gen_nodes(database_info):
     # Obter todos os nomes de tabelas
     tables = get_tables_name(database_info)
@@ -109,11 +115,13 @@ def gen_nodes(database_info):
 
     for table_name in tables:
         table_pks = get_table_pk(database_info, table_name)
-        table_fks = get_table_fk(database_info, table_name)
         table_columns = get_table_columns(database_info, table_name)
 
-        # Retira as chaves privadas e foreigns
-        column_names = list(set(table_columns).difference(set(table_pks)).difference(set(table_fks)))
+        # Retira as chaves privadas
+        column_names = list(set(table_columns).difference(set(table_pks)))
+
+        # Gera index para chave primaria da tabela
+        gen_index(f"{table_name}_pk_index", LabelGenerator(table_name), table_pks)
 
         data = {
             "table_name": table_name,
@@ -123,7 +131,7 @@ def gen_nodes(database_info):
             "prefix": f"{args.context}/csv/",
         }
 
-        # Escreve os dados no arquivo cypher
+        # Gera script que cria nodo para cada row
         output_file = os.path.join(nodes_dir, f"{table_name}.cypher")
         with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
             print(template.render(data), file=cypher_file)
@@ -140,60 +148,54 @@ def gen_relations(database_info):
     foreign_keys = {}
 
     # Pega informações sobre as relações, apenas de tabela que estão nas tabelas selecionadas
-    for table_name in tables:
-        foreign_keys = get_table_foreign_info(database_info, table_name)
-        label1 = LabelGenerator(table_name)
-        table_pks = get_table_pk(database_info, table_name)
+    for fk in get_foreign_info(database_info):
+        table_pks = get_table_pk(database_info,fk["from_table"])
+        fk_name = fk["fk_name"]
 
-        for fk in foreign_keys:
-            to_table = fk["to_table"]
-            fk_name = fk["fk_name"]
-            label2 = LabelGenerator(to_table)
-
-            data = {
-                "table_name": table_name,
-                "table1_label": label1,
-                "table2_label": label2,
-                "from_column": fk["from_column"],
-                "to_column": fk["to_column"],
-                "edge_label": LabelGenerator(fk_name),
-                "table_pks": table_pks,
-                "prefix": f"{args.context}/csv/",
-            }
-
-            # Escreve os dados no arquivo cypher
-            output_file = os.path.join(relations_dir, f"{fk_name}.cypher")
-            with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
-                print(template.render(data), file=cypher_file)
-
-            # Escreve dados no arquivo de migração geral
-            print(template.render(data), file=MIGRATE_ALL_FILE)
-            print(f"# RELATION: Arquivo de importação '{fk_name}' gerado em '{output_file}'.")
-
-def gen_indexes(database_info):
-    # Obter todos os nomes de tabelas
-    tables = get_tables_name(database_info)
-    template = env.get_template('node_index_template.j2')
-
-    # Pega informações sobre as relações, apenas de tabela que estão nas tabelas selecionadas
-    for table_name in tables:
-        table_pks = get_table_pk(database_info, table_name)
+        # Gera index da tabela referenciada para fazer match mais eficiente
+        gen_index(f"{fk_name}_fk_index", LabelGenerator(fk["to_table"]), [fk["to_column"]])
 
         data = {
-            "table_name": table_name,
-            "label": LabelGenerator(table_name),
+            "from_table": fk["from_table"],
+            "to_table": fk["to_table"],
+            "from_column": fk["from_column"],
+            "to_column": fk["to_column"],
+            "table1_label": LabelGenerator(fk["from_table"]),
+            "table2_label": LabelGenerator(fk["to_table"]),
+            "edge_label": LabelGenerator(fk_name),
             "table_pks": table_pks,
+            "prefix": f"{args.context}/csv/",
         }
 
         # Escreve os dados no arquivo cypher
-        output_file = os.path.join(indexes_dir, f"{table_name}.cypher")
+        output_file = os.path.join(relations_dir, f"{fk_name}.cypher")
         with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
             print(template.render(data), file=cypher_file)
 
         # Escreve dados no arquivo de migração geral
         print(template.render(data), file=MIGRATE_ALL_FILE)
+        print(f"# RELATION: Arquivo de importação '{fk_name}' gerado em '{output_file}'.")
 
-        print(f"# INDEX: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
+def gen_index(index_name, label, props):
+    template = env.get_template('index_template.j2')
+
+    data = {
+        "index_name": index_name,
+        "label": label,
+        "props": props,
+    }
+
+    # Escreve os dados no arquivo cypher
+    output_file = os.path.join(indexes_dir, f"{index_name}.cypher")
+    with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
+        print(template.render(data), file=cypher_file)
+
+    # Escreve dados no arquivo de migração geral
+    print(template.render(data), file=MIGRATE_ALL_FILE)
+    # Espera para que todos os indexes sejam criados, ja que são criados assincronos
+    print("CALL db.awaitIndexes();", file=MIGRATE_ALL_FILE)
+
+    print(f"# INDEX: Arquivo de importação '{index_name}' gerado em '{output_file}'.")
 
 # Pega os metadados sobre o banco de dados e armazena em um json
 # Os dados coletados são de acordo com os scripts retirados dos scripts
@@ -313,12 +315,6 @@ if args.dump:
 
 MIGRATE_ALL_FILEPATH = os.path.join(output_dir, f"{MIGRATE_ALL_FILENAME}.cypher")
 MIGRATE_ALL_FILE = open(MIGRATE_ALL_FILEPATH, mode="w", newline="", encoding="utf-8")
-
-print("# INDEX: Gerando arquivos de importação dos indexes")
-gen_indexes(database_info)
-
-# Espera para que todos os indexes sejam criados, ja que são criados assincronos
-print("CALL db.awaitIndexes();", file=MIGRATE_ALL_FILE)
 
 print("# NODE: Gerando arquivos de importação de nodes")
 gen_nodes(database_info)

@@ -1,8 +1,3 @@
-LOAD CSV WITH HEADERS FROM 'file:///{{ prefix }}{{ table_name }}.csv' as row
-MATCH (x:{{ table1_label }} {
-{%- for pk in table_pks[:-1] -%}
-{{ pk }}: row.{{ pk }},
-{%- endfor -%}
-{{ table_pks[-1] }}: row.{{ table_pks[-1] }}})
-MATCH (y:{{ table2_label }} { {{ to_column  }}: row.{{ from_column }} })
+MATCH (x:{{ table1_label }})
+MATCH (y:{{ table2_label }} { {{ to_column }}: x.{{ from_column }} })
 MERGE (x)-[:{{ edge_label }}]->(y);

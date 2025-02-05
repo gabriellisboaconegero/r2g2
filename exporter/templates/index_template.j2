@@ -1,0 +1,6 @@
+CREATE INDEX {{ index_name }} IF NOT EXISTS
+FOR (x:{{ label }}) ON (
+{%- for p in props[:-1] -%}
+x.{{ p }},
+{%- endfor -%}
+x.{{ props[-1] }});

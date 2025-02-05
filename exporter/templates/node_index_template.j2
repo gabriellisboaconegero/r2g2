@@ -1,6 +1,0 @@
-CREATE INDEX {{ table_name }}_pk_index IF NOT EXISTS
-FOR (x:{{ label }}) ON (
-{%- for pk in table_pks[:-1] -%}
-x.{{ pk }},
-{%- endfor -%}
-x.{{ table_pks[-1] }});

@@ -25,15 +25,16 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=neo4j
-      - POSTGRES_PASSWORD=neo4j
-      - POSTGRES_DB=neo4j
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
       - POSTGRES_HOST_AUTH_METHOD=md5
       - POSTGRES_INITDB_ARGS=--auth-host=md5
     volumes:
       # Configure qual sample você vai usar com
       # - ./samples/<sample>/postgres:/docker-entrypoint-initdb.d
       - ./samples/sample_db_movies/postgres:/docker-entrypoint-initdb.d
+      # - ./samples/sample_db_northwind/postgres:/docker-entrypoint-initdb.d
       - pgdata:/var/lib/postgresql/data
 
 volumes:
