@@ -43,8 +43,8 @@ parser.add_argument(
 parser.add_argument(
     "--dump",
     action="store_true",
-    default=False,  # O valor padrão será False
-    help="Indica de deve fazer o dump das tabelas para um arquivo csv"
+    default=False,
+    help="Indica de deve fazer o dump das tabelas para um arquivo csv (default: False)"
 )
 
 args = parser.parse_args()
@@ -64,7 +64,9 @@ output_dir = os.path.join(args.context_dir, args.context)
 nodes_dir = os.path.join(output_dir, "nodes")
 relations_dir = os.path.join(output_dir, "relations")
 indexes_dir = os.path.join(output_dir, "indexes")
+cleanup_dir = os.path.join(output_dir, "cleanup")
 csv_dir = os.path.join(output_dir, "csv")
+dirs_to_mkdir = [output_dir, nodes_dir, relations_dir, indexes_dir, cleanup_dir, csv_dir]
 
 
 # Configuração do jinja2
@@ -111,7 +113,7 @@ def get_foreign_info(database_info):
 def gen_nodes(database_info):
     # Obter todos os nomes de tabelas
     tables = get_tables_name(database_info)
-    template = env.get_template('node_template.j2')
+    template = env.get_template('gen_node.j2')
 
     for table_name in tables:
         table_pks = get_table_pk(database_info, table_name)
@@ -143,7 +145,7 @@ def gen_nodes(database_info):
 def gen_relations(database_info):
     # Obter todos os nomes de tabelas
     tables = get_tables_name(database_info)
-    template = env.get_template('relation_template.j2')
+    template = env.get_template('gen_relation.j2')
 
     foreign_keys = {}
 
@@ -153,18 +155,18 @@ def gen_relations(database_info):
         fk_name = fk["fk_name"]
 
         # Gera index da tabela referenciada para fazer match mais eficiente
-        gen_index(f"{fk_name}_fk_index", LabelGenerator(fk["to_table"]), [fk["to_column"]])
+        gen_index(f"{fk_name}_fk_index", LabelGenerator(fk["to_table"]), [fk["to_column"]], True)
 
         data = {
-            "from_table": fk["from_table"],
-            "to_table": fk["to_table"],
-            "from_column": fk["from_column"],
-            "to_column": fk["to_column"],
-            "table1_label": LabelGenerator(fk["from_table"]),
-            "table2_label": LabelGenerator(fk["to_table"]),
+            "from_table" :{
+                "label": LabelGenerator(fk["from_table"]),
+                "column": fk["from_column"],
+            },
+            "to_table": {
+                "label": LabelGenerator(fk["to_table"]),
+                "column": fk["to_column"],
+            },
             "edge_label": LabelGenerator(fk_name),
-            "table_pks": table_pks,
-            "prefix": f"{args.context}/csv/",
         }
 
         # Escreve os dados no arquivo cypher
@@ -176,26 +178,38 @@ def gen_relations(database_info):
         print(template.render(data), file=MIGRATE_ALL_FILE)
         print(f"# RELATION: Arquivo de importação '{fk_name}' gerado em '{output_file}'.")
 
-def gen_index(index_name, label, props):
-    template = env.get_template('index_template.j2')
-
+def gen_index(index_name, label, props, gen_delete = False):
     data = {
         "index_name": index_name,
         "label": label,
         "props": props,
     }
 
-    # Escreve os dados no arquivo cypher
+    template = env.get_template('gen_index.j2')
     output_file = os.path.join(indexes_dir, f"{index_name}.cypher")
     with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
         print(template.render(data), file=cypher_file)
 
+    if gen_delete:
+        template = env.get_template('delete_index.j2')
+        output_file = os.path.join(cleanup_dir, f"{index_name}.cypher")
+        with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
+            print(template.render(data), file=cypher_file)
+
     # Escreve dados no arquivo de migração geral
     print(template.render(data), file=MIGRATE_ALL_FILE)
+
     # Espera para que todos os indexes sejam criados, ja que são criados assincronos
     print("CALL db.awaitIndexes();", file=MIGRATE_ALL_FILE)
 
     print(f"# INDEX: Arquivo de importação '{index_name}' gerado em '{output_file}'.")
+
+def gen_cleanup():
+    output_file = os.path.join(cleanup_dir, f"{ROW_ID}_cleanup.cypher")
+    with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
+        print(f"MATCH (n) remove n.{ROW_ID}", file=cypher_file)
+
+    print(f"# CLEANUP: Arquivo de cleanup '{ROW_ID}' gerado em '{output_file}'.")
 
 # Pega os metadados sobre o banco de dados e armazena em um json
 # Os dados coletados são de acordo com os scripts retirados dos scripts
@@ -301,11 +315,8 @@ def dump_database_csv(database_info):
         exit(1)
 
 # Certifique-se de que o diretório de saída existem
-os.makedirs(output_dir, exist_ok=True)
-os.makedirs(nodes_dir, exist_ok=True)
-os.makedirs(relations_dir, exist_ok=True)
-os.makedirs(indexes_dir, exist_ok=True)
-os.makedirs(csv_dir, exist_ok=True)
+for d in dirs_to_mkdir:
+    os.makedirs(d, exist_ok=True)
 
 database_info = get_database_info()
 
@@ -321,6 +332,9 @@ gen_nodes(database_info)
 
 print("# RELATION: Gerando arquivos de importação de relations")
 gen_relations(database_info)
+
+print(f"# CLEANUP: Gerar arquivo para deletar {ROW_ID}")
+gen_cleanup()
 
 MIGRATE_ALL_FILE.close()
 

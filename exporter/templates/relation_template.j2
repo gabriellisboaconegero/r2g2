@@ -1,3 +1,0 @@
-MATCH (x:{{ table1_label }})
-MATCH (y:{{ table2_label }} { {{ to_column }}: x.{{ from_column }} })
-MERGE (x)-[:{{ edge_label }}]->(y);

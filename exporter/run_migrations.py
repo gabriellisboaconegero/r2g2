@@ -38,6 +38,12 @@ parser.add_argument(
     default="teste123",
     help="Senha do usuário de conexão com o neo4j (default: teste123)"
 )
+parser.add_argument(
+    "--cleanup",
+    action="store_true",
+    default=False,
+    help="Indica de devem ser apagados os índices criados para as chaves estrangeiras (default: False)"
+)
 
 args = parser.parse_args()
 print(f"Diretório de scripts: {args.context}")
@@ -54,6 +60,7 @@ output_dir = os.path.join(args.context_dir, args.context)
 nodes_dir = os.path.join(output_dir, "nodes")
 relations_dir = os.path.join(output_dir, "relations")
 indexes_dir = os.path.join(output_dir, "indexes")
+cleanup_dir = os.path.join(output_dir, "cleanup")
 csv_dir = os.path.join(output_dir, "csv")
 
 driver = GraphDatabase.driver(args.uri, auth=(args.user, args.password))
@@ -64,21 +71,24 @@ total_summary = {
     'relationships_created': 0,
 }
 
-def run_cypher_file(file_path):
+def run_cypher(cypher_code):
     global total_time, total_nodes_created, total_relations_created
     with driver.session() as session:
-        with open(file_path, "r") as file:
-            cypher_query = file.read()
-            inicio = time.time()
-            summary = session.run(cypher_query).consume().counters
-            fim = time.time()
-            exec_time = fim - inicio
+        inicio = time.time()
+        summary = session.run(cypher_code).consume().counters
+        fim = time.time()
+        exec_time = fim - inicio
 
-            total_time += exec_time
-            total_summary['nodes_created'] += summary.nodes_created
-            total_summary['relationships_created'] += summary.relationships_created
+        total_time += exec_time
+        total_summary['nodes_created'] += summary.nodes_created
+        total_summary['relationships_created'] += summary.relationships_created
 
-            return (summary, exec_time)
+        return (summary, exec_time)
+
+def run_cypher_file(file_path):
+    with open(file_path, "r") as file:
+        cypher_query = file.read()
+        return run_cypher(cypher_query)
 
 def run_migration(migration_dir):
     for file in os.listdir(migration_dir):
@@ -89,9 +99,24 @@ def run_migration(migration_dir):
             print(f"Sumario: {summary}")
             print(f"Tempo: {exec_time:.4f} segundos")
 
+# Cria labels/índices
 run_migration(indexes_dir)
+
+# Espera serem criados
+print(f"Esperando indexes serem criados")
+summary, exec_time = run_cypher("CALL db.awaitIndexes();")
+print(f"Sumario: {summary}")
+print(f"Tempo: {exec_time:.4f} segundos")
+
+# Importa os dados, cria vértices
 run_migration(nodes_dir)
+
+# Gera as arestas
 run_migration(relations_dir)
+
+# Otimiza o resultado, eliminando índices desnecessários
+if args.cleanup:
+    run_migration(cleanup_dir)
 
 print(f"Tempo de execução total: {total_time}")
 print(f"Sumario final: {total_summary}")
