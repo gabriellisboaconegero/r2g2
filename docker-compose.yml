@@ -1,3 +1,11 @@
+x-postgres: &x-postgres
+  image: postgres
+  environment:
+    - POSTGRES_USER=postgres
+    - POSTGRES_PASSWORD=postgres
+    - POSTGRES_DB=postgres
+    - POSTGRES_HOST_AUTH_METHOD=md5
+    - POSTGRES_INITDB_ARGS=--auth-host=md5
 services:
   neo4j:
     build: .
@@ -20,24 +28,41 @@ services:
     ports:
       - "8080:80"
 
-  db:
-    image: postgres
+  db1:
+    <<: *x-postgres
     ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=postgres
-      - POSTGRES_HOST_AUTH_METHOD=md5
-      - POSTGRES_INITDB_ARGS=--auth-host=md5
+      - "5431:5432"
     volumes:
       # Configure qual sample você vai usar com
       # - ./samples/<sample>/postgres:/docker-entrypoint-initdb.d
+      - ./samples/sample_db_gravity/postgres:/docker-entrypoint-initdb.d
+      - pgdata1:/var/lib/postgresql/data
+  db2:
+    <<: *x-postgres
+    ports:
+      - "5432:5432"
+    volumes:
       - ./samples/sample_db_movies/postgres:/docker-entrypoint-initdb.d
-      # - ./samples/sample_db_northwind/postgres:/docker-entrypoint-initdb.d
-      - pgdata:/var/lib/postgresql/data
+      - pgdata2:/var/lib/postgresql/data
+  db3:
+    <<: *x-postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./samples/sample_db_northwind/postgres:/docker-entrypoint-initdb.d
+      - pgdata3:/var/lib/postgresql/data
+  db4:
+    <<: *x-postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./samples/sample_db_olympics/postgres:/docker-entrypoint-initdb.d
+      - pgdata4:/var/lib/postgresql/data
 
 volumes:
-  pgdata:
+  pgdata1:
+  pgdata2:
+  pgdata3:
+  pgdata4:
   adegadb-sqlite:
     external: true
