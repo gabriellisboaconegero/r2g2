@@ -28,41 +28,49 @@ services:
     ports:
       - "8080:80"
 
-  db1:
-    <<: *x-postgres
-    ports:
-      - "5431:5432"
-    volumes:
-      # Configure qual sample você vai usar com
-      # - ./samples/<sample>/postgres:/docker-entrypoint-initdb.d
-      - ./samples/sample_db_gravity/postgres:/docker-entrypoint-initdb.d
-      - pgdata1:/var/lib/postgresql/data
-  db2:
+  db0:
     <<: *x-postgres
     ports:
       - "5432:5432"
     volumes:
-      - ./samples/sample_db_movies/postgres:/docker-entrypoint-initdb.d
-      - pgdata2:/var/lib/postgresql/data
-  db3:
-    <<: *x-postgres
-    ports:
-      - "5433:5432"
-    volumes:
-      - ./samples/sample_db_northwind/postgres:/docker-entrypoint-initdb.d
-      - pgdata3:/var/lib/postgresql/data
-  db4:
-    <<: *x-postgres
-    ports:
-      - "5434:5432"
-    volumes:
-      - ./samples/sample_db_olympics/postgres:/docker-entrypoint-initdb.d
-      - pgdata4:/var/lib/postgresql/data
+      # Configure qual sample você vai usar com
+      # - ./samples/<sample>/postgres:/docker-entrypoint-initdb.d
+      - ./samples/sample_db_videogames/postgres:/docker-entrypoint-initdb.d
+      - pgdata0:/var/lib/postgresql/data
+  # db1:
+  #   <<: *x-postgres
+  #   ports:
+  #     - "5431:5432"
+  #   volumes:
+  #     - ./samples/sample_db_gravity/postgres:/docker-entrypoint-initdb.d
+  #     - pgdata1:/var/lib/postgresql/data
+  # db2:
+  #   <<: *x-postgres
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - ./samples/sample_db_movies/postgres:/docker-entrypoint-initdb.d
+  #     - pgdata2:/var/lib/postgresql/data
+  # db3:
+  #   <<: *x-postgres
+  #   ports:
+  #     - "5433:5432"
+  #   volumes:
+  #     - ./samples/sample_db_northwind/postgres:/docker-entrypoint-initdb.d
+  #     - pgdata3:/var/lib/postgresql/data
+  # db4:
+  #   <<: *x-postgres
+  #   ports:
+  #     - "5434:5432"
+  #   volumes:
+  #     - ./samples/sample_db_olympics/postgres:/docker-entrypoint-initdb.d
+  #     - pgdata4:/var/lib/postgresql/data
 
 volumes:
-  pgdata1:
-  pgdata2:
-  pgdata3:
-  pgdata4:
+  pgdata0:
+  # pgdata1:
+  # pgdata2:
+  # pgdata3:
+  # pgdata4:
   adegadb-sqlite:
     external: true

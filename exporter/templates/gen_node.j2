@@ -10,4 +10,9 @@ ON CREATE SET
     x.{{ col }} = row.{{ col }},
     {% endfor %}
     x.{{ column_names[-1] }} = row.{{ column_names[-1] }}
+ON MATCH SET
+    {% for col in column_names[:-1] %}
+    x.{{ col }} = row.{{ col }},
+    {% endfor %}
+    x.{{ column_names[-1] }} = row.{{ column_names[-1] }}
 {%- endif -%};

@@ -42,7 +42,7 @@ parser.add_argument(
     "--cleanup",
     action="store_true",
     default=False,
-    help="Indica de devem ser apagados os índices criados para as chaves estrangeiras (default: False)"
+    help="Indica se devem ser apagados os índices criados para as chaves estrangeiras (default: False)"
 )
 
 args = parser.parse_args()

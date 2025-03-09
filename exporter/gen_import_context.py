@@ -9,6 +9,10 @@ import json
 from jinja2 import Environment, FileSystemLoader
 import argparse
 from urllib.parse import urlparse
+import time
+
+# Conta o tempo total para criar os scripts e csv's
+total_time = 0
 
 root_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -52,8 +56,7 @@ print(f"Banco de dados selecionado: {args.db}")
 print(f"Diretório de saída: {args.context}")
 print(f"URI de conexão: {args.uri}")
 
-ROW_ID = "technical_pk"
-MIGRATE_ALL_FILENAME = "migrate"
+ROW_ID = "technical_id"
 
 # Arquivos internos
 templates_dir = os.path.join(root_dir, "templates")
@@ -138,8 +141,6 @@ def gen_nodes(database_info):
         with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
             print(template.render(data), file=cypher_file)
 
-        # Escreve dados no arquivo de migração geral
-        print(template.render(data), file=MIGRATE_ALL_FILE)
         print(f"# NODE: Arquivo de importação '{table_name}' gerado em '{output_file}'.")
 
 def gen_relations(database_info):
@@ -174,8 +175,6 @@ def gen_relations(database_info):
         with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
             print(template.render(data), file=cypher_file)
 
-        # Escreve dados no arquivo de migração geral
-        print(template.render(data), file=MIGRATE_ALL_FILE)
         print(f"# RELATION: Arquivo de importação '{fk_name}' gerado em '{output_file}'.")
 
 def gen_index(index_name, label, props, gen_delete = False):
@@ -196,20 +195,7 @@ def gen_index(index_name, label, props, gen_delete = False):
         with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
             print(template.render(data), file=cypher_file)
 
-    # Escreve dados no arquivo de migração geral
-    print(template.render(data), file=MIGRATE_ALL_FILE)
-
-    # Espera para que todos os indexes sejam criados, ja que são criados assincronos
-    print("CALL db.awaitIndexes();", file=MIGRATE_ALL_FILE)
-
     print(f"# INDEX: Arquivo de importação '{index_name}' gerado em '{output_file}'.")
-
-def gen_cleanup():
-    output_file = os.path.join(cleanup_dir, f"{ROW_ID}_cleanup.cypher")
-    with open(output_file, mode="w", newline="", encoding="utf-8") as cypher_file:
-        print(f"MATCH (n) remove n.{ROW_ID}", file=cypher_file)
-
-    print(f"# CLEANUP: Arquivo de cleanup '{ROW_ID}' gerado em '{output_file}'.")
 
 # Pega os metadados sobre o banco de dados e armazena em um json
 # Os dados coletados são de acordo com os scripts retirados dos scripts
@@ -298,7 +284,7 @@ def pg_dump(database_info):
             rows[i] = (i,)+row
 
         with open(output_file, mode="w", newline="", encoding="utf-8") as csv_file:
-            writer = csv.writer(csv_file)
+            writer = csv.writer(csv_file, quotechar="\"")
             writer.writerow(table_columns)
             writer.writerows(rows)
         print(f"# DUMP: Fazendo dump da tabela '{table_schema}.{table_name}' em '{output_file}'")
@@ -318,14 +304,12 @@ def dump_database_csv(database_info):
 for d in dirs_to_mkdir:
     os.makedirs(d, exist_ok=True)
 
+inicio = time.time()
+
 database_info = get_database_info()
 
 if args.dump:
     dump_database_csv(database_info)
-
-
-MIGRATE_ALL_FILEPATH = os.path.join(output_dir, f"{MIGRATE_ALL_FILENAME}.cypher")
-MIGRATE_ALL_FILE = open(MIGRATE_ALL_FILEPATH, mode="w", newline="", encoding="utf-8")
 
 print("# NODE: Gerando arquivos de importação de nodes")
 gen_nodes(database_info)
@@ -333,11 +317,8 @@ gen_nodes(database_info)
 print("# RELATION: Gerando arquivos de importação de relations")
 gen_relations(database_info)
 
-print(f"# CLEANUP: Gerar arquivo para deletar {ROW_ID}")
-gen_cleanup()
-
-MIGRATE_ALL_FILE.close()
-
-print(f"Arquivo de transferência completo gerado em '{MIGRATE_ALL_FILEPATH}'")
+fim = time.time()
+total_time = fim - inicio
+print(f"Tempo total de execução: {total_time:.4f} segundos")
 print("Exportação concluída!")
 
